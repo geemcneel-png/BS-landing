@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Beauty Shop - Place Your Order</title>
     <style>
+        /* (*** CSS STYLES ARE THE SAME AS YOUR ORIGINAL FILE ***) */
         * {
             margin: 0;
             padding: 0;
@@ -53,26 +54,7 @@
             font-size: 16px;
         }
         
-        .loading-catalog {
-            text-align: center;
-            padding: 40px;
-            color: #718096;
-        }
-        
-        .spinner {
-            border: 3px solid #f3f4f6;
-            border-top: 3px solid #c33a3a;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 15px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        /* Removed .loading-catalog and .spinner since catalog is gone */
         
         .section-title {
             color: #c33a3a;
@@ -135,36 +117,37 @@
             margin-bottom: 20px;
         }
         
-        .category-group {
-            margin-bottom: 20px;
-        }
-        
-        .category-label {
-            color: #c33a3a;
-            font-weight: 700;
-            font-size: 16px;
-            margin-bottom: 10px;
-            display: block;
-        }
-        
-        .product-row {
+        /* New/Modified CSS for manual entry */
+        .product-item-row {
             display: grid;
-            grid-template-columns: 2fr 1fr auto;
+            grid-template-columns: 2fr 1fr 1fr auto; /* Name | Price | Qty | Remove */
             gap: 10px;
             margin-bottom: 10px;
             align-items: center;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f9e2d8;
+        }
+
+        .product-item-row:last-child {
+            border-bottom: none;
         }
         
-        .product-select {
-            background: white;
+        .product-name-input {
+            grid-column: 1 / 2;
         }
-        
+
+        .product-price-input {
+            grid-column: 2 / 3;
+        }
+
         .qty-input {
+            grid-column: 3 / 4;
             text-align: center;
             font-weight: 600;
         }
-        
+
         .btn-remove {
+            grid-column: 4 / 5;
             padding: 8px 12px;
             background: #e53e3e;
             color: white;
@@ -360,13 +343,25 @@
                 grid-template-columns: 1fr;
             }
             
-            .product-row {
-                grid-template-columns: 1fr;
-                gap: 8px;
+            .product-item-row { /* Adjusted for small screen */
+                grid-template-columns: 1fr 1fr;
             }
-            
+
+            .product-name-input {
+                grid-column: 1 / 3; /* Full width */
+            }
+
+            .product-price-input {
+                grid-column: 1 / 2;
+            }
+
+            .qty-input {
+                grid-column: 2 / 3;
+            }
+
             .btn-remove {
-                width: 100%;
+                grid-column: 1 / 3; /* Full width for remove button */
+                margin-top: 5px;
             }
         }
     </style>
@@ -378,12 +373,7 @@
             <p>Select your products and place your order</p>
         </div>
         
-        <div id="loading-catalog" class="loading-catalog">
-            <div class="spinner"></div>
-            <p>Loading product catalog...</p>
-        </div>
-        
-        <form id="order-form" style="display: none;">
+        <form id="order-form">
             <div class="section-title">👤 Customer Details</div>
             
             <div class="form-row">
@@ -408,16 +398,28 @@
                 <textarea id="address" name="address" required placeholder="123 Main Street, Suburb, City, Postal Code"></textarea>
             </div>
             
-            <div class="section-title">🛍️ Select Products</div>
+            <div class="section-title">🛍️ Enter Order Items</div>
             
             <div id="product-selection" class="product-selection">
-                </div>
+                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; margin-bottom: 10px; font-weight: 600; color: #718096;">
+                    <span>Product Name <span class="required">*</span></span>
+                    <span style="text-align: center;">Price (R) <span class="required">*</span></span>
+                    <span style="text-align: center;">Qty <span class="required">*</span></span>
+                    <span></span> </div>
+                
+                <div id="item-rows-container">
+                    </div>
+                
+                <button type="button" class="btn-add-more" onclick="addProductRow()">
+                    ➕ Add Another Item
+                </button>
+            </div>
             
             <div class="section-title">🛒 Your Order</div>
             
             <div class="cart-summary">
                 <div id="cart-items" class="cart-items">
-                    <div class="empty-cart">Select products above to see your order</div>
+                    <div class="empty-cart">Enter products above to see your order</div>
                 </div>
                 <div class="cart-total">
                     <span>Total:</span>
@@ -447,89 +449,340 @@
 
     <script>
         // ⚠️ REPLACE THIS URL WITH YOUR APPS SCRIPT WEB APP URL
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwv16H_4FdwvnlS0cVLYIoNkVufVDBbMBDNnAY6inD1N_NtEb0ippfMR8SzJzstwvKq/exec';
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz6eHWD6pFktMZ4Ae9yC3aJPk_zgk-S8O3_zOvE8odMXLPIL7Y_Wj73x_4Biv6lkMc/exec';
         
-        let CATALOG = {};
+        let itemRowCounter = 0;
         let selectedProducts = {};
-        let productRowCounter = {}; // Track how many rows per category
         
-        // Load catalog on page load
-        async function loadCatalog() {
-            try {
-                const response = await fetch(SCRIPT_URL);
-                const data = await response.json();
-                
-                if (data.success) {
-                    CATALOG = data.catalog;
-                    // Initialize row counters
-                    for (const category of Object.keys(CATALOG)) {
-                        productRowCounter[category] = 0;
-                    }
-                    generateProductSelectors();
-                    document.getElementById('loading-catalog').style.display = 'none';
-                    document.getElementById('order-form').style.display = 'block';
-                } else {
-                    showError('Failed to load product catalog. Please refresh the page.');
-                }
-            } catch (error) {
-                console.error('Error loading catalog:', error);
-                showError('Failed to load product catalog. Please check your connection and refresh.');
-            }
+        // --- Initialization ---
+        // Instead of loading catalog, we just start with one empty row
+        function initializeForm() {
+            addProductRow();
+            // The form is always visible now
+            document.getElementById('order-form').style.display = 'block';
         }
-        
-        function showError(message) {
-            document.getElementById('loading-catalog').innerHTML = `
-                <p style="color: #e53e3e; font-weight: 600;">${message}</p>
-            `;
-        }
-        
-        // Generate product selection dropdowns
-        function generateProductSelectors() {
-            const container = document.getElementById('product-selection');
-            
-            for (const category of Object.keys(CATALOG)) {
-                const categoryDiv = document.createElement('div');
-                categoryDiv.className = 'category-group';
-                categoryDiv.id = `category-${category}`;
-                
-                const categoryLabel = document.createElement('label');
-                categoryLabel.className = 'category-label';
-                categoryLabel.textContent = category;
-                categoryDiv.appendChild(categoryLabel);
-                
-                // Container for product rows
-                const rowsContainer = document.createElement('div');
-                rowsContainer.id = `rows-${category}`;
-                categoryDiv.appendChild(rowsContainer);
-                
-                // Add first row
-                addProductRow(category, rowsContainer);
-                
-                // Add "Add Another" button
-                const addButton = document.createElement('button');
-                addButton.type = 'button';
-                addButton.className = 'btn-add-more';
-                addButton.innerHTML = '➕ Add Another ' + category + ' Item';
-                addButton.onclick = () => addProductRow(category, rowsContainer);
-                categoryDiv.appendChild(addButton);
-                
-                container.appendChild(categoryDiv);
-            }
-        }
-        
-        // Add a product row to a category
-        function addProductRow(category, container) {
-            const rowId = `${category}-${productRowCounter[category]}`;
-            productRowCounter[category]++;
+
+        // --- Product Row Logic ---
+        function addProductRow() {
+            const rowId = `item-${itemRowCounter++}`;
+            const container = document.getElementById('item-rows-container');
             
             const productRow = document.createElement('div');
-            productRow.className = 'product-row';
+            productRow.className = 'product-item-row';
             productRow.id = `row-${rowId}`;
             
-            // Product dropdown
-            const select = document.createElement('select');
-            select.className = 'product-select form-group';
-            select.id = `select-${rowId}`;
-            select.onchange = () => updateCart();
+            const updateHandler = () => updateCart();
+
+            // Product Name input
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.className = 'product-name-input';
+            nameInput.id = `name-${rowId}`;
+            nameInput.required = true;
+            nameInput.placeholder = 'e.g., Anew Day Cream';
+            nameInput.oninput = updateHandler;
+
+            // Price input
+            const priceInput = document.createElement('input');
+            priceInput.type = 'number';
+            priceInput.className = 'product-price-input';
+            priceInput.id = `price-${rowId}`;
+            priceInput.min = 0.01;
+            priceInput.step = 0.01;
+            priceInput.required = true;
+            priceInput.placeholder = 'R0.00';
+            priceInput.oninput = updateHandler;
+
+            // Quantity input
+            const qtyInput = document.createElement('input');
+            qtyInput.type = 'number';
+            qtyInput.className = 'qty-input';
+            qtyInput.id = `qty-${rowId}`;
+            qtyInput.value = 1;
+            qtyInput.min = 1;
+            qtyInput.max = 99;
+            qtyInput.oninput = updateHandler;
+
+            // Remove button
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn-remove';
+            removeBtn.textContent = '✕';
+            removeBtn.onclick = () => removeProductRow(rowId);
             
-            // Add "None" option
+            productRow.appendChild(nameInput);
+            productRow.appendChild(priceInput);
+            productRow.appendChild(qtyInput);
+            productRow.appendChild(removeBtn);
+            
+            container.appendChild(productRow);
+            
+            updateRemoveButtons();
+            updateCart();
+        }
+        
+        // Remove a product row
+        function removeProductRow(rowId) {
+            const row = document.getElementById(`row-${rowId}`);
+            if (row) {
+                row.remove();
+                updateRemoveButtons();
+                updateCart();
+            }
+        }
+        
+        // Update visibility of remove buttons (hide if only one row)
+        function updateRemoveButtons() {
+            const container = document.getElementById('item-rows-container');
+            const rows = container.querySelectorAll('.product-item-row');
+            
+            rows.forEach(row => {
+                const removeBtn = row.querySelector('.btn-remove');
+                if (rows.length > 1) {
+                    removeBtn.style.display = 'block';
+                } else {
+                    removeBtn.style.display = 'none';
+                }
+            });
+        }
+        
+        // --- Cart Logic ---
+        function updateCart() {
+            selectedProducts = {};
+            let total = 0;
+            let itemCounter = 0;
+            
+            const rows = document.getElementById('item-rows-container').querySelectorAll('.product-item-row');
+            
+            rows.forEach(row => {
+                const rowId = row.id.replace('row-', '');
+                const nameInput = document.getElementById(`name-${rowId}`);
+                const priceInput = document.getElementById(`price-${rowId}`);
+                const qtyInput = document.getElementById(`qty-${rowId}`);
+                
+                const name = nameInput.value.trim();
+                const price = parseFloat(priceInput.value) || 0;
+                const quantity = parseInt(qtyInput.value) || 0;
+
+                if (name && price > 0 && quantity > 0) {
+                    const lineTotal = price * quantity;
+                    
+                    const uniqueKey = `item-${itemCounter++}`;
+                    
+                    selectedProducts[uniqueKey] = {
+                        // Manual entry does not have a product code, use a placeholder
+                        code: 'MANUAL', 
+                        name: name,
+                        price: price,
+                        quantity: quantity,
+                        lineTotal: lineTotal
+                    };
+                    
+                    total += lineTotal;
+                }
+            });
+            
+            renderCart(total);
+        }
+        
+        // Render cart display
+        function renderCart(total) {
+            const cartItemsDiv = document.getElementById('cart-items');
+            const cartTotalSpan = document.getElementById('cart-total');
+            
+            if (Object.keys(selectedProducts).length === 0) {
+                cartItemsDiv.innerHTML = '<div class="empty-cart">Enter products above to see your order</div>';
+                cartTotalSpan.textContent = 'R0.00';
+                return;
+            }
+            
+            let html = '';
+            
+            for (const product of Object.values(selectedProducts)) {
+                html += `
+                    <div class="cart-item">
+                        <div>
+                            <strong>${product.name}</strong><br>
+                            <small style="color: #718096;">R${product.price.toFixed(2)} × ${product.quantity}</small>
+                        </div>
+                        <div style="font-weight: 700; color: #c33a3a;">R${product.lineTotal.toFixed(2)}</div>
+                    </div>
+                `;
+            }
+            
+            cartItemsDiv.innerHTML = html;
+            cartTotalSpan.textContent = `R${total.toFixed(2)}`;
+        }
+        
+        // --- Signature Pad Setup (Unchanged) ---
+        const canvas = document.getElementById('signature-pad');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let hasSignature = false;
+        
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+        
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        function startDrawing(e) {
+            isDrawing = true;
+            hasSignature = true;
+            const pos = getPosition(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        }
+        
+        function draw(e) {
+            if (!isDrawing) return;
+            
+            const pos = getPosition(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+        
+        function stopDrawing() {
+            isDrawing = false;
+        }
+        
+        function getPosition(e) {
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches ? e.touches[0] : e;
+            return {
+                x: touch.clientX - rect.left,
+                y: touch.clientY - rect.top
+            };
+        }
+        
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+        
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startDrawing(e);
+        });
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            draw(e);
+        });
+        canvas.addEventListener('touchend', stopDrawing);
+        
+        function clearSignature() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            hasSignature = false;
+        }
+        
+        // --- Form submission (Updated reset logic) ---
+        document.getElementById('order-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (Object.keys(selectedProducts).length === 0) {
+                showMessage('Please enter at least one product with a name, price, and quantity!', 'error');
+                return;
+            }
+
+            // Check if all required inputs (Name, Price) are filled for selected products
+            const allProductsValid = Array.from(document.getElementById('item-rows-container').querySelectorAll('.product-item-row')).every(row => {
+                const rowId = row.id.replace('row-', '');
+                const nameInput = document.getElementById(`name-${rowId}`);
+                const priceInput = document.getElementById(`price-${rowId}`);
+                return nameInput.value.trim() !== '' && (parseFloat(priceInput.value) || 0) > 0;
+            });
+
+            if (!allProductsValid) {
+                showMessage('Please ensure all entered items have a Product Name and Price.', 'error');
+                return;
+            }
+            
+            if (!hasSignature) {
+                showMessage('Please provide your signature before submitting.', 'error');
+                return;
+            }
+            
+            const submitBtn = document.getElementById('submit-btn');
+            const loading = document.getElementById('loading');
+            const statusMessage = document.getElementById('status-message');
+            
+            submitBtn.disabled = true;
+            loading.classList.add('active');
+            statusMessage.style.display = 'none';
+            
+            // Build order items
+            const orderItems = Object.values(selectedProducts);
+            let total = orderItems.reduce((sum, item) => sum + item.lineTotal, 0);
+
+            const formData = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value,
+                address: document.getElementById('address').value,
+                orderItems: orderItems,
+                total: total,
+                signature: canvas.toDataURL('image/png')
+            };
+            
+            try {
+                // NOTE: Using fetch with 'no-cors' mode is a trick for App Script POST. 
+                // The 'no-cors' means the front-end can't read the response directly, 
+                // but the App Script POST still executes. The success/error message 
+                // is purely based on whether the fetch call itself succeeds.
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                // Assuming successful submission since we can't read 'no-cors' response
+                showMessage('✅ Order placed successfully! Check your email for invoice and payment link.', 'success');
+                document.getElementById('order-form').reset();
+                selectedProducts = {};
+                renderCart(0);
+                
+                // Reset all product selections - remove extra rows and reset first row
+                const container = document.getElementById('item-rows-container');
+                container.innerHTML = ''; // Clear all rows
+                itemRowCounter = 0;
+                addProductRow(); // Add one fresh row
+                
+                clearSignature();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                // This catch often doesn't fire for App Script CORS errors, but good to have.
+                showMessage('❌ Something went wrong. Please try again or contact us directly.', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                loading.classList.remove('active');
+            }
+        });
+        
+        function showMessage(message, type) {
+            const statusMessage = document.getElementById('status-message');
+            statusMessage.textContent = message;
+            statusMessage.className = 'status-message ' + type;
+            statusMessage.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusMessage.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        // Load form when page loads
+        initializeForm();
+    </script>
+</body>
+</html>
